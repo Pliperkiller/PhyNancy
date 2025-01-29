@@ -185,3 +185,4 @@ pyrightconfig.json
 *.csv
 *.xlsx
 keys.json
+tester.ipynb
