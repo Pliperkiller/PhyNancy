@@ -1,8 +1,9 @@
 from tools import credential_manager as creds
-from conections import api_conections as api_cnx
+from connections import api_connections as api_cnx
 from extractor import  api_clients as api_cli ,api_extractor as api_xtr
 import pandas as pd
 from datetime import datetime, timedelta
+from pathlib import Path
 
 def extract_binance_api_data(market='futures', symbol = 'BTCUSDT', interval = '15m', start_date = '2025-02-01' , end_date='2026-01-01',  **kwargs):
     for key, value in kwargs.items():
@@ -52,11 +53,38 @@ def get_data_range(start_date, end_date):
 
     return df_general
 
+
+def first_day_of_year():
+    return datetime(datetime.now().year, 1, 1).strftime('%Y-%m-%d')
+
+def second_day_of_next_month():
+    today = datetime.now()
+    first_day_next_month = datetime(today.year + (today.month // 12), (today.month % 12) + 1, 1)
+    second_day = first_day_next_month + timedelta(days=1)
+    return second_day.strftime('%Y-%m-%d')
+
+def save_df_to_csv(data,filename):
+    data.columns = [col.lower().replace(' ', '_') for col in data.columns]
+    actual_path = Path(__file__).resolve()
+    parent_folder = actual_path.parent.parent
+    file_path = parent_folder / 'data' / filename
+    data.to_csv(file_path, index=False)
+    print(f"Data saved in {file_path}")
+
+
+
 if __name__ == '__main__':
-    start_date = '2025-02-01'
-    end_date = '2025-03-01'
+    # Request data from the user
+    start_date = input("Enter the start date (YYYY-MM-DD) or press Enter to use the default date: ")
+    end_date = input("Enter the end date (YYYY-MM-DD) or press Enter to use the default date: ")
+    file_name = input("Enter the file name or press Enter to use the default: ")
+
+    # Assign default values if inputs are empty
+    start_date = start_date if start_date else first_day_of_year()
+    end_date = end_date if end_date else second_day_of_next_month()
+    file_name = file_name if file_name else 'data.csv'
 
     data = get_data_range(start_date, end_date)
-    path = r'C:\\Users\\Usuario\Documents\\codeFolder\\nancy\\PhyNancy\\data\\'
-    data.to_csv(path+'BTCUSD_futures_15m.csv',index=False)
+    save_df_to_csv(data,file_name)
+
     print(data)
