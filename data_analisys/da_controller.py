@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
+import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -8,7 +10,7 @@ import plotly.io as pio
 pio.renderers.default = 'browser'
 
 class BasicBuyer:
-    def __init__(self,funds=100):
+    def __init__(self, funds=100):
         self.funds = funds
         self._buy_price = 0
         self._sell_price = 0
@@ -22,60 +24,50 @@ class BasicBuyer:
         self.max_drawdown = funds
         self.max_trade_rate = 1
         self.min_trade_rate = 1
-        pass
 
     def recalculate_params(self):
         if self._buy_price:
-            trade_rate = (self._sell_price/self._buy_price)
-            self.funds = trade_rate * self.funds
+            trade_rate = self._sell_price / self._buy_price
+            self.funds *= trade_rate
 
             self.calculate_trade_rate(trade_rate)
-            self.calculate_drawdowun()
-            self.calculate_winstreak()
+            self.calculate_drawdown()
+            self.calculate_streaks()
             self.reset_status()
 
-        pass
-
-    def buy(self,buy_price):
+    def buy(self, buy_price):
         if not self.buy_status:
             self._buy_price = buy_price
             self.buy_status = True
-        pass
 
     def sell(self, sell_price):
         if self.buy_status:
             self._sell_price = sell_price
-
             self.check_result()
             self.recalculate_params()
-        pass
 
     def check_result(self):
         if self._buy_price < self._sell_price:
-            self.win_count+=1
+            self.win_count += 1
         else:
-            self.lose_count+=1
-        pass
+            self.lose_count += 1
 
-    def calculate_drawdowun(self):
-        self.max_drawdown = min(self.funds,self.max_drawdown)
-        pass
+    def calculate_drawdown(self):
+        self.max_drawdown = min(self.funds, self.max_drawdown)
 
-    def calculate_winstreak(self):
-        if self._buy_price > self._sell_price:
-            self._winstreak+=1
+    def calculate_streaks(self):
+        if self._sell_price > self._buy_price:  # Ganancia
+            self._winstreak += 1
             self._losestreak = 0
             self.max_winstreak = max(self.max_winstreak, self._winstreak)
-        else:
-            self._losestreak+=1
+        else:  # Pérdida
+            self._losestreak += 1
             self._winstreak = 0
-            self.max_losestreak = max(self.max_losestreak,self._losestreak)
-        pass
+            self.max_losestreak = max(self.max_losestreak, self._losestreak)
 
-    def calculate_trade_rate(self,trade_rate):
-        self.max_trade_rate = max(self.max_trade_rate,trade_rate)
-        self.min_trade_rate = min(self.min_trade_rate,trade_rate)
-        pass
+    def calculate_trade_rate(self, trade_rate):
+        self.max_trade_rate = max(self.max_trade_rate, trade_rate)
+        self.min_trade_rate = min(self.min_trade_rate, trade_rate)
 
     def reset_status(self):
         self._buy_price = 0
@@ -83,38 +75,34 @@ class BasicBuyer:
         self.buy_status = False
 
 
-
 class StrategyManager:
-    def __init__(self,initial_signal,fig = None):
+    def __init__(self, initial_signal, fig=None):
         self.buyer = BasicBuyer()
-        self.signal = None
-        self.read_signal(initial_signal)
+        self.signal = initial_signal
         self.total_purchases = 0
         self.fig = fig
-        pass
 
-    def read_signal(self,signal):
-        self.signal = signal
+    def check_signal(self, signal, price, time):
+        if self.signal != signal:
+            self.signal = signal
 
-    def check_signal(self,signal,price,time):
-        self.read_signal(signal)
-        if (not self.buyer.buy_status) and (self.signal == 1):
+        if not self.buyer.buy_status and self.signal == 1:
             self.total_purchases += 1
-            self.buyer.buy(buy_price=price)
-            if self.fig:
-                self.fig.add_hline(y=price, line=dict(color="green", width=2, dash="dash"))
-                self.fig.add_vline(x=time, line=dict(color="green", width=2, dash="dash"))
+            self.buyer.buy(price)
+            self.plot_trade(price, time, "green")
 
-        if (self.buyer.buy_status) and (self.signal == -1):
-            self.buyer.sell(sell_price=price)
-            if self.fig:
-                self.fig.add_hline(y=price, line=dict(color="red", width=2, dash="dash"))
-                self.fig.add_vline(x=time, line=dict(color="red", width=2, dash="dash"))
-        pass
+        elif self.buyer.buy_status and self.signal == -1:
+            self.buyer.sell(price)
+            self.plot_trade(price, time, "red")
+
+    def plot_trade(self, price, time, color):
+        if self.fig:
+            self.fig.add_hline(y=price, line=dict(color=color, width=2, dash="dash"))
+            self.fig.add_vline(x=time, line=dict(color=color, width=2, dash="dash"))
 
     def report_funds(self):
         return self.buyer.funds
-    
+
     def print_stats(self):
         print(f'Final funds: {self.buyer.funds}',
               f'Total trades: {self.total_purchases}',
@@ -126,40 +114,36 @@ class StrategyManager:
               f'Max lose streak: {self.buyer.max_losestreak}',
               f'Max drawdown: {self.buyer.max_drawdown}',
               sep='\n')
-        
 
-def check_strategy(df):
-    i = 0
+
+def check_strategy(data):
+    strategy = None
     funds = []
-    for index, row in df.iterrows():
-        if i == 0: 
-            strategy = StrategyManager(initial_signal=row['signal'])
-        strategy.check_signal(signal=row['signal'],price=row['close'],time=row['open_time'])
-        funds += [strategy.report_funds()]
-        
 
-        i+=1
+    for i, row in enumerate(data.itertuples(index=False)):
+        if i == 0:
+            strategy = StrategyManager(initial_signal=row.signal)
+
+        strategy.check_signal(signal=row.signal, price=row.close, time=row.open_time)
+        funds.append(strategy.report_funds())
+
+    df = pd.DataFrame({'open_time': data['open_time'], 'funds': funds})
+    df['open_time'] = pd.to_datetime(df['open_time'])
+    return df, strategy
+
+
+def strategy_summary(data):
+    df, strategy = check_strategy(data)
     strategy.print_stats()
-    return funds
+    plt.figure(figsize=(14, 6))  # Aumentar tamaño del gráfico
+    sns.lineplot(x='open_time', y='funds', data=df, label="Funds vs Time", color='b')
 
-def strategy_sumary(df):
-    funds = check_strategy(df)
-    time = df['open_time']
-    Y = list(funds)
-    X = list(time)
+    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
 
-    # Crear el line plot
-    plt.plot(X, Y, label="Funds vs Time", color='b')  # Puedes cambiar el color si lo deseas
+    plt.xticks(rotation=45)
+    plt.tight_layout()
 
-    # Etiquetas y título
-    plt.xlabel('Time')  # Etiqueta del eje X
-    plt.ylabel('Funds')  # Etiqueta del eje Y
-    plt.title("Funds vs Time")  # Título del gráfico
-
-    # Mostrar la leyenda
-    plt.legend()
-
-    # Mostrar la figura
     plt.show()
 
 

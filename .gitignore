@@ -186,3 +186,4 @@ pyrightconfig.json
 *.xlsx
 keys.json
 tester.ipynb
+strategies.py
