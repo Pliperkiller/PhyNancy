@@ -1,5 +1,9 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import plotly.io as pio
 pio.renderers.default = 'browser'
 
@@ -81,27 +85,27 @@ class BasicBuyer:
 
 
 class StrategyManager:
-    def __init__(self,initial_trend,fig = None):
+    def __init__(self,initial_signal,fig = None):
         self.buyer = BasicBuyer()
-        self.trend = None
-        self.read_trend(initial_trend)
+        self.signal = None
+        self.read_signal(initial_signal)
         self.total_purchases = 0
         self.fig = fig
         pass
 
-    def read_trend(self,trend):
-        self.trend = trend
+    def read_signal(self,signal):
+        self.signal = signal
 
-    def check_strategy(self,trend,price,time):
-        self.read_trend(trend)
-        if (not self.buyer.buy_status) and (self.trend == 'uptrend'):
+    def check_signal(self,signal,price,time):
+        self.read_signal(signal)
+        if (not self.buyer.buy_status) and (self.signal == 1):
             self.total_purchases += 1
             self.buyer.buy(buy_price=price)
             if self.fig:
                 self.fig.add_hline(y=price, line=dict(color="green", width=2, dash="dash"))
                 self.fig.add_vline(x=time, line=dict(color="green", width=2, dash="dash"))
 
-        if (self.buyer.buy_status) and (self.trend == 'downtrend'):
+        if (self.buyer.buy_status) and (self.signal == -1):
             self.buyer.sell(sell_price=price)
             if self.fig:
                 self.fig.add_hline(y=price, line=dict(color="red", width=2, dash="dash"))
@@ -124,27 +128,13 @@ class StrategyManager:
               sep='\n')
         
 
-def plot_strategy():
-    i = 0
-    fig = px.scatter(filtered_df, x="open_time", y="open", color="EMADX_trend", title="Scatterplot de Open Price vs Open Time")
-    fig.update_layout(xaxis_title="Open Time", yaxis_title="Open Price",height=1000)
-    for index, row in filtered_df.iterrows():
-        if i == 0: 
-            strategy = StrategyManager(initial_trend=row['EMADX_trend'],fig=fig)
-        strategy.check_strategy(trend=row['EMADX_trend'],price=row['open'],time=row['open_time'])
-
-        i+=1
-    print(f'Win: {strategy.buyer.win_count}',f'Loose: {strategy.buyer.lose_count}',sep='\n')
-
-    fig.show()
-
 def check_strategy(df):
     i = 0
     funds = []
     for index, row in df.iterrows():
         if i == 0: 
-            strategy = StrategyManager(initial_trend=row['EMADX_trend'])
-        strategy.check_strategy(trend=row['EMADX_trend'],price=row['close'],time=row['open_time'])
+            strategy = StrategyManager(initial_signal=row['signal'])
+        strategy.check_signal(signal=row['signal'],price=row['close'],time=row['open_time'])
         funds += [strategy.report_funds()]
         
 
@@ -152,8 +142,10 @@ def check_strategy(df):
     strategy.print_stats()
     return funds
 
-def strategy_sumary(funds,time):
-    Y = funds
+def strategy_sumary(df):
+    funds = check_strategy(df)
+    time = df['open_time']
+    Y = list(funds)
     X = list(time)
 
     # Crear el line plot
@@ -170,30 +162,19 @@ def strategy_sumary(funds,time):
     # Mostrar la figura
     plt.show()
 
-def plot_candlestick(data):
-    
-    fig = go.Figure(data=[go.Candlestick(
-        x=data['open_time'],
-        open=data['open'],
-        high=data['high'],
-        low=data['low'],
-        close=data['close'],
-        increasing_line_color='green',
-        decreasing_line_color='red'
-    )])
-    fig.update_layout(title='Candlestick Chart', xaxis_title='Date', yaxis_title='Price')
-    pio.show(fig, browser='default')
 
-def plot_strategy_signals(df):
+def plot_strategy_signals(data):
+    df = data.copy()
+    df['signal']=df['signal'].map({-1: 'Sell', 0: 'Hold', 1: 'Buy'})
     color_map = {
-        "downtrend": "red",
-        "uptrend": "green",
-        "sideways": "#ADD8E6"
+        "Sell": "red",
+        "Buy": "green",
+        "Hold": "#ADD8E6"
     }
     fig = px.scatter(df, 
                     x="open_time", 
                     y="close", 
-                    color="EMADX_trend", 
+                    color="signal", 
                     title="Scatterplot de Open Price vs Open Time", 
                     color_discrete_map=color_map)
     fig.update_layout(xaxis_title="Open Time", yaxis_title="Open Price",height=1000)
@@ -224,3 +205,19 @@ def plot_strategy_signals(df):
 
     # Mostrar la gráfica
     fig.show()
+
+## GRAFICO DE VELAS
+
+def plot_candlestick(data):
+    
+    fig = go.Figure(data=[go.Candlestick(
+        x=data['open_time'],
+        open=data['open'],
+        high=data['high'],
+        low=data['low'],
+        close=data['close'],
+        increasing_line_color='green',
+        decreasing_line_color='red'
+    )])
+    fig.update_layout(title='Candlestick Chart', xaxis_title='Date', yaxis_title='Price')
+    pio.show(fig, browser='default')

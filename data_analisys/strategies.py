@@ -1,5 +1,6 @@
 import pandas_ta as ta
 import pandas as pd
+import numpy as np  
 
 def EMADX_strategy(data,fast_EMA=9,slow_EMA=21, long_EMA = 200 ,ADX_thresh=25,ADX_period=14):
     """
@@ -22,18 +23,9 @@ def EMADX_strategy(data,fast_EMA=9,slow_EMA=21, long_EMA = 200 ,ADX_thresh=25,AD
     colname = 'ADX_'+str(ADX_period)
     df['ADX'] = adx_df[colname]
     
-    # Función para determinar la tendencia según las condiciones definidas.
-    def trend_signal(row):
-        if pd.isna(row['EMA_fast']) or pd.isna(row['EMA_slow']) or pd.isna(row['ADX']):
-            return 'undefined'
-        if row['EMA_fast'] > row['EMA_slow'] and row['ADX'] > ADX_thresh and row['EMA_fast']> row['EMA_long'] and row['EMA_slow'] > row['EMA_long']:
-            return 'uptrend'
-        elif row['EMA_fast'] < row['EMA_slow'] and row['ADX'] > ADX_thresh and row['EMA_fast']<row['EMA_long'] and row['EMA_slow']<row['EMA_long']:
-            return 'downtrend'
-        else:
-            return 'sideways'
-    
-    df['EMADX_trend'] = df.apply(trend_signal, axis=1)
+    df['signal'] = np.where((df['EMA_fast'] > df['EMA_slow']) & (df['ADX'] > ADX_thresh) & (df['EMA_fast']> df['EMA_long']) & (df['EMA_slow'] > df['EMA_long']), 1, 
+                    np.where((df['EMA_fast'] < df['EMA_slow']) & (df['ADX'] > ADX_thresh) & (df['EMA_fast']<df['EMA_long']) & (df['EMA_slow']<df['EMA_long']), -1, 
+                                0))
     
     return df
 
