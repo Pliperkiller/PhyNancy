@@ -75,120 +75,90 @@ class BasicBuyer:
         self.buy_status = False
 
 
-class StrategyManager:
-    def __init__(self, initial_signal, fig=None):
+
+class SpotTradeAnalyzer:
+    def __init__(self, strategy_signals: pd.DataFrame, name: str='Strategy'):
+        self.name = name
+        self.data = strategy_signals
         self.buyer = BasicBuyer()
-        self.signal = initial_signal
-        self.total_purchases = 0
-        self.fig = fig
+        self.total_trades = 0
+        self.results ={}
+        self.returns_chart = None
+        self.check_strategy()
+        self.set_results()
 
-    def check_signal(self, signal, price, time):
-        if self.signal != signal:
-            self.signal = signal
+    def check_strategy(self):
+        signals = self.data['signal'].values
+        prices = self.data['close'].values
+        funds = [0] * len(signals)
+        times = self.data['open_time'].values
 
-        if not self.buyer.buy_status and self.signal == 1:
-            self.total_purchases += 1
-            self.buyer.buy(price)
-            self.plot_trade(price, time, "green")
+        buyer = self.buyer
 
-        elif self.buyer.buy_status and self.signal == -1:
-            self.buyer.sell(price)
-            self.plot_trade(price, time, "red")
+        for i, (sig, price) in enumerate(zip(signals, prices)):
 
-    def plot_trade(self, price, time, color):
-        if self.fig:
-            self.fig.add_hline(y=price, line=dict(color=color, width=2, dash="dash"))
-            self.fig.add_vline(x=time, line=dict(color=color, width=2, dash="dash"))
+            if not buyer.buy_status and sig == 1 and isinstance(price, (int, float)):
+                buyer.buy(price)
+            elif buyer.buy_status and sig == -1 and isinstance(price, (int, float)) and not np.isnan(price):
+                buyer.sell(price)
+                self.total_trades += 1
 
-    def report_funds(self):
-        return self.buyer.funds
+            funds[i] = buyer.funds
+        returns = pd.DataFrame({'open_time': times, 'funds': funds})
+        returns['open_time'] = pd.to_datetime(returns['open_time'])
+        self.returns_chart = returns
+    
+    def set_results(self):
+        self.results['Final funds'] = self.buyer.funds
+        self.results['Total trades'] = self.total_trades
+        self.results['Win trades'] = self.buyer.win_count
+        self.results['Lose trades'] = self.buyer.lose_count
+        self.results['Max trade rate'] = self.buyer.max_trade_rate
+        self.results['Min trade rate'] = self.buyer.min_trade_rate
+        self.results['Max win streak'] = self.buyer.max_winstreak
+        self.results['Max lose streak'] = self.buyer.max_losestreak
+        self.results['Max drawdown'] = self.buyer.max_drawdown
 
-    def print_stats(self):
-        print(f'Final funds: {self.buyer.funds}',
-              f'Total trades: {self.total_purchases}',
-              f'Win trades: {self.buyer.win_count}',
-              f'Lose trades: {self.buyer.lose_count}',
-              f'Max trade rate: {self.buyer.max_trade_rate}',
-              f'Min trade rate: {self.buyer.min_trade_rate}',
-              f'Max win streak: {self.buyer.max_winstreak}',
-              f'Max lose streak: {self.buyer.max_losestreak}',
-              f'Max drawdown: {self.buyer.max_drawdown}',
-              sep='\n')
+    def print_results(self):
+        for key, value in self.results.items():
+            print(f'{key}: {value}')
 
+    def plot_performance(self):
+        df = self.returns_chart
 
-def check_strategy(data):
-    strategy = None
-    funds = []
+        plt.figure(figsize=(14, 6))
+        sns.lineplot(x='open_time', y='funds', data=df, label="Funds vs Time", color='b')
 
-    for i, row in enumerate(data.itertuples(index=False)):
-        if i == 0:
-            strategy = StrategyManager(initial_signal=row.signal)
+        ax = plt.gca()
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+        ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+        
+        # Agregar grids por cada mes
+        ax.xaxis.set_minor_locator(mdates.MonthLocator())
+        ax.grid(which='minor', linestyle='--', linewidth=0.7, color='gray')
+        ax.grid(which='major', linestyle='-', linewidth=1, color='black')
 
-        strategy.check_signal(signal=row.signal, price=row.close, time=row.open_time)
-        funds.append(strategy.report_funds())
+        plt.xticks(rotation=45)
+        plt.tight_layout()
+        plt.title(f'{self.name} Funds vs Time')
+        plt.show()
 
-    df = pd.DataFrame({'open_time': data['open_time'], 'funds': funds})
-    df['open_time'] = pd.to_datetime(df['open_time'])
-    return df, strategy
-
-
-def strategy_summary(data):
-    df, strategy = check_strategy(data)
-    strategy.print_stats()
-    plt.figure(figsize=(14, 6))  # Aumentar tamaño del gráfico
-    sns.lineplot(x='open_time', y='funds', data=df, label="Funds vs Time", color='b')
-
-    plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-    plt.gca().xaxis.set_major_locator(mdates.AutoDateLocator())
-
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    plt.show()
-
-
-def plot_strategy_signals(data):
-    df = data.copy()
-    df['signal']=df['signal'].map({-1: 'Sell', 0: 'Hold', 1: 'Buy'})
-    color_map = {
-        "Sell": "red",
-        "Buy": "green",
-        "Hold": "#ADD8E6"
-    }
-    fig = px.scatter(df, 
-                    x="open_time", 
-                    y="close", 
-                    color="signal", 
-                    title="Scatterplot de Open Price vs Open Time", 
-                    color_discrete_map=color_map)
-    fig.update_layout(xaxis_title="Open Time", yaxis_title="Open Price",height=1000)
-
-    fig.add_trace(go.Scatter(
-        x=df["open_time"], 
-        y=df["EMA_fast"], 
-        mode='lines', 
-        name='EMA_fast',
-        line=dict(color='orange', width=2)
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=df["open_time"], 
-        y=df["EMA_slow"], 
-        mode='lines', 
-        name='EMA_slow',
-        line=dict(color='purple', width=2)
-    ))
-
-    fig.add_trace(go.Scatter(
-        x=df["open_time"], 
-        y=df["EMA_long"], 
-        mode='lines', 
-        name='EMA_long',
-        line=dict(color='blue', width=2)
-    ))
-
-    # Mostrar la gráfica
-    fig.show()
+    def plot_strategy_signals(self):
+        df = self.data.copy()
+        df['signal']=df['signal'].map({-1: 'Sell', 0: 'Hold', 1: 'Buy'})
+        color_map = {
+            "Sell": "red",
+            "Buy": "green",
+            "Hold": "#ADD8E6"
+        }
+        fig = px.scatter(df, 
+                        x="open_time", 
+                        y="close", 
+                        color="signal", 
+                        title="Scatterplot de Open Price vs Open Time", 
+                        color_discrete_map=color_map)
+        fig.update_layout(xaxis_title="Open Time", yaxis_title="Open Price")
+        fig.show()
 
 ## GRAFICO DE VELAS
 
@@ -205,3 +175,30 @@ def plot_candlestick(data):
     )])
     fig.update_layout(title='Candlestick Chart', xaxis_title='Date', yaxis_title='Price')
     pio.show(fig, browser='default')
+
+def format_df(df):
+    df['open_time'] = pd.to_datetime(df['open_time'])
+    df['close_time'] = pd.to_datetime(df['close_time'])
+    df['open'] = df['open'].astype(float)
+    df['high'] = df['high'].astype(float)
+    df['low'] = df['low'].astype(float)
+    df['close'] = df['close'].astype(float)
+    df['volume'] = df['volume'].astype(float)
+    df['quote_asset_volume'] = df['quote_asset_volume'].astype(float)
+    df['number_of_trades'] = df['number_of_trades'].astype(int)
+    df['taker_buy_base_volume'] = df['taker_buy_base_volume'].astype(float)
+    df['taker_buy_quote_volume'] = df['taker_buy_quote_volume'].astype(float)
+    df['ignore'] = df['ignore'].astype(int)
+    return df
+
+def detailed_backtest(df, strategy, **kwargs):
+    strategy_df = strategy(df, **kwargs)
+    trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__)
+    trade_analyzer.print_results()
+    trade_analyzer.plot_performance()
+    trade_analyzer.plot_strategy_signals()
+
+def backtest(df, strategy, **kwargs):
+    strategy_df = strategy(df, **kwargs)
+    trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__)
+    return trade_analyzer.results['Final funds']

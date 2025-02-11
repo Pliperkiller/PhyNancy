@@ -2,10 +2,11 @@ from tools import credential_manager as creds
 from connections import api_connections as api_cnx
 from extractor import api_clients as api_cli, api_extractor as api_xtr
 import pandas as pd
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
+
 
 
 def extract_binance_api_data(market='futures', symbol='BTCUSDT', interval='15m', start_date='2025-02-01', end_date='2026-01-01', testnet=False):
@@ -26,14 +27,19 @@ def extract_binance_api_data(market='futures', symbol='BTCUSDT', interval='15m',
     return item.get_data(interval=interval, start_date=start_date, end_date=end_date)
 
 
-def get_data_range(start_date, end_date, chunk_size_days=7, max_workers=5,interval='15m'):
+def get_data_range(start_date, end_date, chunk_size_days=3, max_workers=5, interval='15m'):
+    #Binance api limit settings
+    request_counter = 0
+    REQUEST_LIMIT = 4000
+    WAIT_TIME = 61
+    
     start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
     end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
 
     date_ranges = []
     current_date = start_date_obj
 
-    # Generate date ranges
+    # Generar rangos de fechas
     while current_date < end_date_obj:
         start = current_date
         end = min(current_date + timedelta(days=chunk_size_days), end_date_obj)
@@ -42,10 +48,12 @@ def get_data_range(start_date, end_date, chunk_size_days=7, max_workers=5,interv
 
     data_frames = []
 
-    # Parallelization
+    # Paralelización
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_date = {executor.submit(extract_binance_api_data, start_date=start, end_date=end, testnet=False,interval=interval): (start, end)
-                           for start, end in date_ranges}
+        future_to_date = {
+            executor.submit(extract_binance_api_data, start_date=start, end_date=end, testnet=False, interval=interval): (start, end)
+            for start, end in date_ranges
+        }
 
         for future in as_completed(future_to_date):
             start, end = future_to_date[future]
@@ -53,11 +61,22 @@ def get_data_range(start_date, end_date, chunk_size_days=7, max_workers=5,interv
                 print(f"Extracting data from {start} to {end}")
                 df = future.result()
                 data_frames.append(df)
+
+                # Incrementar el contador de requests
+                request_counter += 1
+                
+                # Verificar si se ha alcanzado el límite de requests
+                if request_counter >= REQUEST_LIMIT:
+                    print(f"Se alcanzaron {REQUEST_LIMIT} requests. Esperando {WAIT_TIME} segundos...")
+                    time.sleep(WAIT_TIME)
+                    request_counter = 0  # Reiniciar el contador después de la espera
+
             except Exception as e:
                 print(f"Error extracting data from {start} to {end}: {e}")
-                time.sleep(5)  # Wait before retrying
+                time.sleep(5)  # Esperar antes de reintentar
 
     return pd.concat(data_frames, ignore_index=True)
+
 
 
 def first_day_of_year():
@@ -75,6 +94,10 @@ def save_df_to_csv(data, filename):
     data.columns = [col.lower().replace(' ', '_') for col in data.columns]
     data.drop_duplicates(inplace=True)
     data.sort_values('open_time', inplace=True)
+    localtime = datetime.now(timezone.utc).astimezone()
+    UTCdiff = localtime.utcoffset().total_seconds() / 3600
+    data['open_time'] = pd.to_datetime(data['open_time'])+pd.to_timedelta(UTCdiff, unit='h')
+    data['close_time'] = pd.to_datetime(data['close_time'])+pd.to_timedelta(UTCdiff, unit='h')
     actual_path = Path(__file__).resolve()
     parent_folder = actual_path.parent.parent
     file_path = parent_folder / 'data' / filename
