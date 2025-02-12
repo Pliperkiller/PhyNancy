@@ -27,7 +27,7 @@ def extract_binance_api_data(market='futures', symbol='BTCUSDT', interval='15m',
     return item.get_data(interval=interval, start_date=start_date, end_date=end_date)
 
 
-def get_data_range(start_date, end_date, chunk_size_days=3, max_workers=5, interval='15m'):
+def get_data_range(start_date, end_date, chunk_size_days=3, max_workers=5, interval='15m',market='futures',symbol ='BTCUSDT'):
     #Binance api limit settings
     request_counter = 0
     REQUEST_LIMIT = 4000
@@ -51,7 +51,7 @@ def get_data_range(start_date, end_date, chunk_size_days=3, max_workers=5, inter
     # Paralelización
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         future_to_date = {
-            executor.submit(extract_binance_api_data, start_date=start, end_date=end, testnet=False, interval=interval): (start, end)
+            executor.submit(extract_binance_api_data, start_date=start, end_date=end, testnet=False, interval=interval,market = market,symbol = symbol): (start, end)
             for start, end in date_ranges
         }
 
@@ -106,19 +106,35 @@ def save_df_to_csv(data, filename):
 
 
 if __name__ == '__main__':
+    default_start_date = first_day_of_year()
+    default_end_date = second_day_of_next_month()
+    default_market = 'futures'
+    default_symbol = 'BTCUSDT'
+    default_interval = '15m'
     # Request data from the user
-    start_date = input("Enter the start date (YYYY-MM-DD) or press Enter to use the default date: ")
-    end_date = input("Enter the end date (YYYY-MM-DD) or press Enter to use the default date: ")
-    interval = input("Enter the interval (e.g., 1m, 15m) or press Enter to use the default (15m): ")
-    file_name = input("Enter the file name or press Enter to use the default: ")
+    market = input(f"Enter the market (spot or futures) or press Enter to use the default market ({default_market}): ")
+    symbol = input(f"Enter the pair (e.g., BTCUSDT) or press Enter to use the default pair ({default_symbol}): ")
+    start_date = input(f"Enter the start date (YYYY-MM-DD) or press Enter to use the default date ({default_start_date}): ")
+    end_date = input(f"Enter the end date (YYYY-MM-DD) or press Enter to use the default date({default_end_date}): ")
+    interval = input(f"Enter the interval (e.g., 1m, 15m) or press Enter to use the default ({default_interval}): ")
+
+    market = market if market else default_market
+    symbol = symbol if symbol else default_symbol
+    start_date = start_date if start_date else default_start_date
+    end_date = end_date if end_date else default_end_date
+    interval = interval if interval else default_interval
+
+
+    default_file_name = f"{symbol}_{market}_{interval}_{start_date}_{end_date}.csv"
+    file_name = input(f"Enter the file name or press Enter to use the default({default_file_name}): ")
 
     # Assign default values if inputs are empty
     start_date = start_date if start_date else first_day_of_year()
     end_date = end_date if end_date else second_day_of_next_month()
     interval = interval if interval else '15m'
-    file_name = file_name if file_name else 'BTCUSDT_futures_15m.csv'
+    file_name = file_name if file_name else default_file_name
 
-    data = get_data_range(start_date, end_date, interval=interval)
+    data = get_data_range(start_date, end_date, interval=interval,market=default_market,symbol=default_symbol)
     save_df_to_csv(data, file_name)
 
     print(data)

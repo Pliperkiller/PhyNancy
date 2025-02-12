@@ -7,11 +7,15 @@ import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
+from abc import ABC, abstractmethod
 pio.renderers.default = 'browser'
 
+
+
 class BasicBuyer:
-    def __init__(self, funds=100):
+    def __init__(self, funds=100,trade_comission=None):
         self.funds = funds
+        self.trade_comission = trade_comission
         self._buy_price = 0
         self._sell_price = 0
         self.win_count = 0
@@ -28,7 +32,7 @@ class BasicBuyer:
     def recalculate_params(self):
         if self._buy_price:
             trade_rate = self._sell_price / self._buy_price
-            self.funds *= trade_rate
+            self.funds = self.funds*trade_rate*(1-self.trade_comission)**2 if self.trade_comission else self.funds*trade_rate 
 
             self.calculate_trade_rate(trade_rate)
             self.calculate_drawdown()
@@ -56,11 +60,11 @@ class BasicBuyer:
         self.max_drawdown = min(self.funds, self.max_drawdown)
 
     def calculate_streaks(self):
-        if self._sell_price > self._buy_price:  # Ganancia
+        if self._sell_price > self._buy_price:
             self._winstreak += 1
             self._losestreak = 0
             self.max_winstreak = max(self.max_winstreak, self._winstreak)
-        else:  # Pérdida
+        else:
             self._losestreak += 1
             self._winstreak = 0
             self.max_losestreak = max(self.max_losestreak, self._losestreak)
@@ -77,10 +81,10 @@ class BasicBuyer:
 
 
 class SpotTradeAnalyzer:
-    def __init__(self, strategy_signals: pd.DataFrame, name: str='Strategy'):
+    def __init__(self, strategy_signals: pd.DataFrame, name: str='Strategy',trade_comission=None):
         self.name = name
         self.data = strategy_signals
-        self.buyer = BasicBuyer()
+        self.buyer = BasicBuyer(trade_comission=trade_comission) 
         self.total_trades = 0
         self.results ={}
         self.returns_chart = None
@@ -196,9 +200,21 @@ def detailed_backtest(df, strategy, **kwargs):
     trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__)
     trade_analyzer.print_results()
     trade_analyzer.plot_performance()
-    trade_analyzer.plot_strategy_signals()
+    #trade_analyzer.plot_strategy_signals()
+
+def detailed_true_backtest(df, strategy, trade_comission=0.001,**kwargs):
+    strategy_df = strategy(df, **kwargs)
+    trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__,trade_comission=trade_comission)
+    trade_analyzer.print_results()
+    trade_analyzer.plot_performance()
+    #trade_analyzer.plot_strategy_signals()
 
 def backtest(df, strategy, **kwargs):
     strategy_df = strategy(df, **kwargs)
     trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__)
+    return trade_analyzer.results['Final funds']
+
+def true_backtest(df, strategy, trade_comission=0.001,**kwargs):
+    strategy_df = strategy(df, **kwargs)
+    trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__,trade_comission=trade_comission)
     return trade_analyzer.results['Final funds']
