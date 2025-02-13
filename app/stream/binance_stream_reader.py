@@ -3,7 +3,7 @@ import websocket
 import json
 
 class BinanceWebSocket(ABC):
-    """Abstract class for Binance WebSocket clients"""
+    """Parent class for Binance WebSocket clients"""
     def __init__(self, symbol: str, interval: str, on_kline_update):
         """
         Base constructor for any Binance WebSocket.
@@ -34,9 +34,11 @@ class BinanceWebSocket(ABC):
         low_price = float(kline['l'])
         close_price = float(kline['c'])
         volume = float(kline['v'])
+        open_time = kline['t']
+        close_time = kline['T']
 
         # Call the update function
-        self.on_kline_update(is_closed, open_price, high_price, low_price, close_price, volume)
+        self.on_kline_update(is_closed, open_time, close_time, open_price, high_price, low_price, close_price, volume)
 
     def on_error(self, ws, error):
         """Error handling"""

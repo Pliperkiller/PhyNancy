@@ -6,11 +6,10 @@ import websocket
 
 def handle_kline_update(is_closed, open_price, high_price, low_price, close_price, volume):
     """Function that handles the candle data when updated"""
-    print(f"\nActual candle updated:\n Open: {open_price}, High: {high_price}, Low: {low_price}, Close: {close_price}, Volume: {volume}", end='\r')
     
-    # You can add your logic here to make decisions based on price action
     if is_closed:
-        print("The candle has closed, you can evaluate the trading strategy.")
+        print(f"\nActual candle updated:\n Open: {open_price}, High: {high_price}, Low: {low_price}, Close: {close_price}, Volume: {volume}", end='\r')
+
 
 if __name__ == "__main__":
 
