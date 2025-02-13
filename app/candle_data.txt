@@ -1,0 +1,12 @@
+Open: 97591.5, High: 97640.0, Low: 97591.5, Close: 97617.0, Volume: 37.117
+Open: 97617.1, High: 97630.0, Low: 97617.0, Close: 97629.9, Volume: 42.674
+Open: 97630.0, High: 97630.0, Low: 97618.1, Close: 97618.2, Volume: 9.845
+Open: 97618.2, High: 97627.9, Low: 97611.1, Close: 97611.1, Volume: 25.988
+Open: 97611.1, High: 97611.1, Low: 97512.5, Close: 97522.3, Volume: 145.999
+Open: 97522.3, High: 97522.4, Low: 97393.8, Close: 97431.2, Volume: 326.084
+Open: 97431.3, High: 97434.3, Low: 97309.1, Close: 97343.8, Volume: 269.636
+Open: 97343.7, High: 97431.9, Low: 97343.7, Close: 97349.9, Volume: 229.874
+Open: 97349.8, High: 97447.5, Low: 97349.8, Close: 97430.1, Volume: 128.471
+Open: 97430.1, High: 97446.4, Low: 97415.7, Close: 97446.4, Volume: 42.727
+Open: 97446.4, High: 97451.2, Low: 97440.0, Close: 97451.2, Volume: 33.795
+Open: 97451.2, High: 97462.8, Low: 97403.8, Close: 97403.8, Volume: 41.911
