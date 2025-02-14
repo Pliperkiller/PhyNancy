@@ -132,7 +132,7 @@ class GeneticOptimizer:
             
             population = new_population
             
-            print(f'Generation {generation + 1}/{n_generations} - '
+            print(f'Generation {generation}/{n_generations} - '
                   f'Best Fitness: {best_fitness:.2f} - '
                   f'Diversity: {diversity:.2f}', end='\r')
             

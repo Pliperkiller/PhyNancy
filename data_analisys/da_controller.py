@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import plotly.io as pio
 from abc import ABC, abstractmethod
-pio.renderers.default = 'browser'
+
 
 
 
@@ -148,6 +148,7 @@ class SpotTradeAnalyzer:
         plt.show()
 
     def plot_strategy_signals(self):
+        pio.renderers.default = 'browser'
         df = self.data.copy()
         df['signal']=df['signal'].map({-1: 'Sell', 0: 'Hold', 1: 'Buy'})
         color_map = {
@@ -163,7 +164,7 @@ class SpotTradeAnalyzer:
                         color_discrete_map=color_map)
         fig.update_layout(xaxis_title="Open Time", yaxis_title="Open Price")
         fig.show()
-
+        
 ## GRAFICO DE VELAS
 
 def plot_candlestick(data):
@@ -208,6 +209,11 @@ def detailed_true_backtest(df, strategy, trade_comission=0.001,**kwargs):
     trade_analyzer.print_results()
     trade_analyzer.plot_performance()
     #trade_analyzer.plot_strategy_signals()
+
+def plot_strategy_signals(df, strategy, **kwargs):
+    strategy_df = strategy(df, **kwargs)
+    trade_analyzer = SpotTradeAnalyzer(strategy_df,name=strategy.__name__)
+    trade_analyzer.plot_strategy_signals()
 
 def backtest(df, strategy, **kwargs):
     strategy_df = strategy(df, **kwargs)
