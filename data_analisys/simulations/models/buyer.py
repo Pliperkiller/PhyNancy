@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from order import StockOrder,BasicFuturesOrder,Order
 
+#TODO: Manage Futures Buyer
+
 class Buyer(ABC):
     def __init__(self,trade_value):
         self.trade_value = trade_value
@@ -13,7 +15,7 @@ class Buyer(ABC):
         pass
 
     @abstractmethod
-    def close_orders(self):
+    def check_orders(self):
         pass
 
 class StockBuyer(Buyer):
@@ -37,10 +39,9 @@ class StockBuyer(Buyer):
         self.in_order=True
         pass
 
-    def close_orders(self):
+    def check_orders(self):
         for order in self.orders:
-            if order.is_open:
-                order.close(price=self.market_price)
+            order.close(price=self.market_price)
         self.in_order = False
         pass
 
@@ -53,5 +54,5 @@ class StockBuyer(Buyer):
         if self.signal ==1 and not self.in_order:
             self.open_order()
         elif self.signal ==-1 and self.in_order:
-            self.close_orders()
+            self.check_orders()
             

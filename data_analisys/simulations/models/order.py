@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from buyer import Buyer, StockBuyer
-# TODO: Add order open date att,
-# TODO: Manage TP and SL with max and min cases (cases when TP and SL collide with candlestick max or min)
+
 class Order(ABC):
     _id_counter = 0
 
@@ -18,13 +17,15 @@ class Order(ABC):
         self.is_open = False
         self.value_change = None
         self.trade_rate = None
+        self.open_date = None
+        self.close_date = None
 
     @abstractmethod
     def open(self, *args, **kwargs):
         pass
 
     @abstractmethod
-    def close(self, price):
+    def close(self, *args, **kwargs):
         pass
 
 class StockOrder(Order):
@@ -32,20 +33,22 @@ class StockOrder(Order):
         super().__init__(buyer)
         self.trade_commission = None
 
-    def open(self, price, value):
+    def open(self, price, value, open_date=None):
         self.trade_commission = self.buyer.trade_commission
         self.open_price = price
         self.open_value = value
         self.is_open = True
-        print(f'Open Stock Order {self.id} at price {self.open_price} for {self.open_value} USDT')
+        self.open_date = open_date
+        print(f'Open Stock Order {self.id} at price {self.open_price} for {self.open_value} USDT on {self.open_date}')
 
-    def close(self, price):
+    def close(self, price, close_date=None):
         self.close_price = price
         self.trade_rate = self.close_price / self.open_price
         self.close_value = self.open_value * self.trade_rate * (1 - self.trade_commission) ** 2
         self.value_change = self.close_value - self.open_value
         self.is_open = False
-        print(f'Close Stock Order {self.id} at price {self.close_price} for {self.close_value:.2f} USDT')
+        self.close_date = close_date
+        print(f'Close Stock Order {self.id} at price {self.close_price} for {self.close_value:.2f} USDT on {self.close_date}')
 
 class BasicFuturesOrder(Order):
     def __init__(self, buyer):
@@ -59,7 +62,7 @@ class BasicFuturesOrder(Order):
         self.rr_ratio = None
         self.order_type = None
 
-    def open(self, price, value, leverage, rr_ratio, stop_loss, order_type):
+    def open(self, price, value, leverage, rr_ratio, stop_loss, order_type, open_date):
         self.taker_commission = self.buyer.taker_commission
         self.maker_commission = self.buyer.maker_commission
         self.open_price = price
@@ -70,6 +73,7 @@ class BasicFuturesOrder(Order):
         self.rr_ratio = rr_ratio
         self.stop_loss = stop_loss
         self.order_type = order_type
+        self.open_date = open_date
 
         if self.order_type == 'Long':
             risk_range = self.open_price - self.stop_loss
@@ -78,25 +82,42 @@ class BasicFuturesOrder(Order):
             risk_range = self.stop_loss - self.open_price
             self.take_profit = self.open_price - risk_range * self.rr_ratio
 
-        print(f'Open {self.order_type} Order {self.id} at price {self.open_price}, take profit {self.take_profit} and stop loss {self.stop_loss} for {self.open_value} USDT')
+        print(f'Open {self.order_type} Order {self.id} at price {self.open_price}, take profit {self.take_profit} and stop loss {self.stop_loss} for {self.open_value} USDT on {self.open_date}')
 
-    def close(self, price):
-        tp = self.take_profit
-        sl = self.stop_loss
+    def close(self, high_price, low_price, close_price, close_date):
+        if not self.is_open:
+            tp = self.take_profit
+            sl = self.stop_loss
 
-        if self.order_type == 'Long':
-            self.close_price = tp if tp < price else (sl if sl > price else price)
-            rate = self.close_price / self.open_price
-            self.close_value = self.open_value + self.position_size * (rate - 1) - self.position_size * (self.taker_commission + rate * self.maker_commission)
-            self.trade_rate = rate
+            if self.order_type == 'Long':
+                if high_price >= tp:
+                    self.close_price = tp
+                    self.is_open = False
+                elif low_price <= sl:
+                    self.close_price = sl
+                    self.is_open = False
+                else:
+                    self.close_price = close_price
 
-        elif self.order_type == 'Short':
-            self.close_price = sl if sl < price else (tp if tp > price else price)
-            rate = self.close_price / self.open_price
-            self.close_value = self.open_value + self.position_size * (1 - rate) - self.position_size * (self.taker_commission + rate * self.maker_commission)
-            self.trade_rate = 1 / rate
+                rate = self.close_price / self.open_price
+                self.close_value = self.open_value + self.position_size * (rate - 1) - self.position_size * (self.taker_commission + rate * self.maker_commission)
+                self.trade_rate = rate
 
-        self.value_change = self.close_value - self.open_value
-        self.is_open = False
-        print(f'Close {self.order_type} Order {self.id} at price {self.close_price} for {self.close_value:.2f} USDT')
+            elif self.order_type == 'Short':
+                if low_price <= sl:
+                    self.close_price = sl
+                    self.is_open = False
+                elif high_price >= tp:
+                    self.close_price = tp
+                    self.is_open = False
+                else:
+                    self.close_price = close_price
 
+                rate = self.close_price / self.open_price
+                self.close_value = self.open_value + self.position_size * (1 - rate) - self.position_size * (self.taker_commission + rate * self.maker_commission)
+                self.trade_rate = 1 / rate
+
+            self.value_change = self.close_value - self.open_value
+            self.is_open = False
+            self.close_date = close_date
+            print(f'Close {self.order_type} Order {self.id} at price {self.close_price} for {self.close_value:.2f} USDT on {self.close_date}')
