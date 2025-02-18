@@ -47,11 +47,11 @@ class Buyer(ABC):
             if not order.is_open:
                 continue
 
-            # Update TP/SL if the method is implemented
-            if hasattr(self, 'calculate_new_tp_sl'):
-                new_tp, new_sl = self.calculate_new_tp_sl(order)
-                if new_tp or new_sl:
-                    self.update_order_tp_sl(order, new_tp, new_sl)
+            # Update TP/SL based on the current candle
+            new_tp = self.current_candle.take_profit if hasattr(self.current_candle, 'take_profit') else None
+            new_sl = self.current_candle.stop_loss if hasattr(self.current_candle, 'stop_loss') else None
+            if new_tp or new_sl:
+                self.update_order_tp_sl(order, new_tp, new_sl)
 
             # Check if the order should be closed
             if self.should_close_order(order):
