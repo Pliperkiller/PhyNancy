@@ -118,7 +118,7 @@ class GeneticOptimizer:
             
             # Restart population if diversity is too low or no improvement
             if diversity < min_diversity or generations_without_improvement > 10:
-                print(f"Restarting population at generation {generation + 1}")
+                print(f"Restarting population at generation {generation}")
                 new_population.extend(self.generate_population()[:self.population_size - self.elite_size])
                 generations_without_improvement = 0
             else:
