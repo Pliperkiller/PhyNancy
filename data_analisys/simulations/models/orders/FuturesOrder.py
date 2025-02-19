@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional, Union, Literal
-from ..buyers import Buyer, StockBuyer
-from Order import Order
-
-class BasicFuturesOrder(Order):
+from typing import Optional, Literal
+from .Order import Order
+#TODO: Check calculations for final value and P&L
+class FuturesOrder(Order):
     def __init__(self, buyer):
         super().__init__(buyer)
         self.taker_commission: Optional[float] = None
@@ -13,7 +12,6 @@ class BasicFuturesOrder(Order):
         self.position_size: Optional[float] = None
         self.stop_loss: Optional[float] = None
         self.take_profit: Optional[float] = None
-        self.rr_ratio: Optional[float] = None
         self.order_type: Optional[Literal['Long', 'Short']] = None
         self.liquidation_price: Optional[float] = None
         self.entry_commission: Optional[float] = None
@@ -21,8 +19,7 @@ class BasicFuturesOrder(Order):
 
     def open(self, price: float, value: float, leverage: float, 
              stop_loss: float, order_type: Literal['Long', 'Short'], 
-             open_date: datetime, take_profit: Optional[float] = None, 
-             rr_ratio: Optional[float] = None):
+             open_date: datetime, take_profit: Optional[float] = None):
         """
         Abre una orden de futuros con opción de especificar take profit o usar rr_ratio
         
@@ -34,13 +31,10 @@ class BasicFuturesOrder(Order):
             order_type: Tipo de orden ('Long' o 'Short')
             open_date: Fecha de apertura
             take_profit: Precio de take profit (opcional)
-            rr_ratio: Ratio riesgo/recompensa (opcional)
             
         Raises:
             ValueError: Si no se proporciona ni take_profit ni rr_ratio
         """
-        if take_profit is None and rr_ratio is None:
-            raise ValueError("Debe especificar take_profit o rr_ratio")
             
         # Configuración básica
         self.taker_commission = self.buyer.taker_commission
@@ -54,30 +48,10 @@ class BasicFuturesOrder(Order):
         self.leverage = leverage
         self.position_size = value * leverage
         self.stop_loss = stop_loss
+        self.take_profit = take_profit
         self.order_type = order_type
         self.open_date = open_date
         
-        # Cálculo de take profit basado en el input proporcionado
-        if take_profit is not None:
-            self.take_profit = take_profit
-            # Calculamos el rr_ratio implícito
-            if self.order_type == 'Long':
-                risk = self.open_price - self.stop_loss
-                reward = self.take_profit - self.open_price
-                self.rr_ratio = reward / risk if risk != 0 else None
-            else:  # Short
-                risk = self.stop_loss - self.open_price
-                reward = self.open_price - self.take_profit
-                self.rr_ratio = reward / risk if risk != 0 else None
-        else:
-            self.rr_ratio = rr_ratio
-            # Calculamos take profit basado en rr_ratio
-            if self.order_type == 'Long':
-                risk_range = self.open_price - self.stop_loss
-                self.take_profit = self.open_price + (risk_range * self.rr_ratio)
-            else:  # Short
-                risk_range = self.stop_loss - self.open_price
-                self.take_profit = self.open_price - (risk_range * self.rr_ratio)
         
         # Calcular precio de liquidación
         if self.order_type == 'Long':
@@ -90,79 +64,6 @@ class BasicFuturesOrder(Order):
         
         self._print_order_details()
 
-    def modify_tp_sl(self, new_take_profit: Optional[float] = None, 
-                    new_stop_loss: Optional[float] = None, 
-                    new_rr_ratio: Optional[float] = None) -> bool:
-        """
-        Modifica el take profit y/o stop loss de la orden
-        
-        Args:
-            new_take_profit: Nuevo precio de take profit (opcional)
-            new_stop_loss: Nuevo precio de stop loss (opcional)
-            new_rr_ratio: Nuevo ratio riesgo/recompensa (opcional)
-            
-        Returns:
-            bool: True si la modificación fue exitosa
-            
-        Raises:
-            ValueError: Si los nuevos valores no son válidos
-        """
-        if not self.is_open:
-            return False
-            
-        # Validar que al menos se proporcione un cambio
-        if new_take_profit is None and new_stop_loss is None and new_rr_ratio is None:
-            raise ValueError("Debe especificar al menos un nuevo valor")
-            
-        # Guardar valores antiguos por si hay que revertir
-        old_tp = self.take_profit
-        old_sl = self.stop_loss
-        old_rr = self.rr_ratio
-        
-        try:
-            # Modificar stop loss si se proporciona
-            if new_stop_loss is not None:
-                if self.order_type == 'Long' and new_stop_loss >= self.open_price:
-                    raise ValueError("Stop loss debe ser menor al precio de entrada en posiciones Long")
-                if self.order_type == 'Short' and new_stop_loss <= self.open_price:
-                    raise ValueError("Stop loss debe ser mayor al precio de entrada en posiciones Short")
-                self.stop_loss = new_stop_loss
-            
-            # Modificar take profit o recalcular basado en rr_ratio
-            if new_take_profit is not None:
-                if self.order_type == 'Long' and new_take_profit <= self.open_price:
-                    raise ValueError("Take profit debe ser mayor al precio de entrada en posiciones Long")
-                if self.order_type == 'Short' and new_take_profit >= self.open_price:
-                    raise ValueError("Take profit debe ser menor al precio de entrada en posiciones Short")
-                self.take_profit = new_take_profit
-                # Actualizar rr_ratio
-                if self.order_type == 'Long':
-                    risk = self.open_price - self.stop_loss
-                    reward = self.take_profit - self.open_price
-                    self.rr_ratio = reward / risk if risk != 0 else None
-                else:
-                    risk = self.stop_loss - self.open_price
-                    reward = self.open_price - self.take_profit
-                    self.rr_ratio = reward / risk if risk != 0 else None
-            elif new_rr_ratio is not None:
-                self.rr_ratio = new_rr_ratio
-                # Recalcular take profit
-                if self.order_type == 'Long':
-                    risk_range = self.open_price - self.stop_loss
-                    self.take_profit = self.open_price + (risk_range * self.rr_ratio)
-                else:
-                    risk_range = self.stop_loss - self.open_price
-                    self.take_profit = self.open_price - (risk_range * self.rr_ratio)
-            
-            self._print_order_details()
-            return True
-            
-        except Exception as e:
-            # Revertir cambios si algo sale mal
-            self.take_profit = old_tp
-            self.stop_loss = old_sl
-            self.rr_ratio = old_rr
-            raise e
 
     def _print_order_details(self):
         """Imprime los detalles actualizados de la orden"""
@@ -303,7 +204,6 @@ class BasicFuturesOrder(Order):
             'leverage': self.leverage,
             'stop_loss': self.stop_loss,
             'take_profit': self.take_profit,
-            'rr_ratio': self.rr_ratio,
             'order_type': self.order_type,
             'liquidation_price': self.liquidation_price,
             'margin': self.margin

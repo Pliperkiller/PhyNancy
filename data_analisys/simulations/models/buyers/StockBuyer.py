@@ -1,6 +1,8 @@
 from typing import Optional, Tuple
-import Buyer
-from ..orders import StockOrder, Order
+from ..orders.Order import Order
+from ..orders.StockOrder import StockOrder
+from .Buyer import Buyer
+
 
 class StockBuyer(Buyer):
     """Implementation of Buyer for the stock market"""
@@ -53,25 +55,3 @@ class StockBuyer(Buyer):
         # Register order in the history
         self.order_history.append(order.to_dict())
         self.in_order = False
-
-    def calculate_new_tp_sl(self, order: Order) -> Tuple[Optional[float], Optional[float]]:
-        """
-        Calculates new TP/SL levels according to the strategy
-        
-        Args:
-            order: Order to evaluate
-            
-        Returns:
-            Tuple[Optional[float], Optional[float]]: New TP and SL
-        """
-        # Implement specific logic to update TP/SL
-        # For example, trailing stop:
-        if not self.current_candle:
-            return None, None
-
-        current_price = self.current_candle.close
-        if current_price > order.open_price:
-            new_sl = current_price * 0.95  # 5% below the current price
-            return None, new_sl
-
-        return None, None

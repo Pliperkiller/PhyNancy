@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 from ..buyers import StockBuyer
-from Order import Order
+from .Order import Order
 
 class StockOrder(Order):
     def __init__(self, buyer: StockBuyer):

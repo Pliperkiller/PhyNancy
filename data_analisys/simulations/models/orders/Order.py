@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Optional, Literal
-from ..buyers import Buyer
+# from ..buyers import Buyer
 
 class Order(ABC):
     _id_counter = 0

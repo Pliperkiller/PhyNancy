@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Tuple
-from ..orders import Order
-from ..candles import Candle
+from ..orders.Order import Order
+from ..candles.Candle import Candle
 
 class Buyer(ABC):
     """
@@ -12,7 +12,7 @@ class Buyer(ABC):
         self.orders: List[Order] = []
         self.trade_value: float = trade_value
         self.current_candle: Optional[Candle] = None
-        self.in_order: bool = False
+        self.in_order: Optional[bool] = False
         
         # History for analysis
         self.order_history: List[Dict] = []
@@ -46,12 +46,6 @@ class Buyer(ABC):
         for order in self.orders:
             if not order.is_open:
                 continue
-
-            # Update TP/SL based on the current candle
-            new_tp = self.current_candle.take_profit if hasattr(self.current_candle, 'take_profit') else None
-            new_sl = self.current_candle.stop_loss if hasattr(self.current_candle, 'stop_loss') else None
-            if new_tp or new_sl:
-                self.update_order_tp_sl(order, new_tp, new_sl)
 
             # Check if the order should be closed
             if self.should_close_order(order):
@@ -90,22 +84,6 @@ class Buyer(ABC):
             order: Order to close
         """
         pass
-
-    def update_order_tp_sl(self, order: Order, new_tp: Optional[float] = None, 
-                          new_sl: Optional[float] = None) -> None:
-        """
-        Updates the take profit and/or stop loss of an order
-        
-        Args:
-            order: Order to update
-            new_tp: New take profit
-            new_sl: New stop loss
-        """
-        if hasattr(order, 'modify_tp_sl'):
-            try:
-                order.modify_tp_sl(new_take_profit=new_tp, new_stop_loss=new_sl)
-            except ValueError as e:
-                print(f"Error updating TP/SL: {e}")
 
     def get_active_orders(self) -> List[Order]:
         """
