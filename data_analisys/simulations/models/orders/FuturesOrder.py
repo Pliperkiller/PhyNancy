@@ -1,5 +1,7 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from operator import ne
+from turtle import position
 from typing import Optional, Literal
 from .Order import Order
 #TODO: Check calculations for final value and P&L
@@ -116,21 +118,28 @@ class FuturesOrder(Order):
 
     def _calculate_final_values(self):
         """Calcula los valores finales de la operación"""
-        exit_commission = self.maker_commission  # Asumimos salida como maker
+        open_commission = self.taker_commission
+        exit_commission = self.maker_commission
+        position_size = self.position_size
+        entry_price = self.open_price
+        exit_price = self.close_price
+
+        units = self.position_size / entry_price
+
+        buy_comission = position_size * open_commission
+        sell_comission = units * exit_price * exit_commission
+  
+        total_commission = buy_comission + sell_comission
         
         if self.order_type == 'Long':
-            price_change_pct = (self.close_price - self.open_price) / self.open_price
-            gross_pnl = self.position_size * price_change_pct
+            gross_pnl = units*(exit_price-entry_price)
         else:  # Short
-            price_change_pct = (self.open_price - self.close_price) / self.open_price
-            gross_pnl = self.position_size * price_change_pct
-        
-        # Calculamos comisiones totales
-        total_commission = (self.position_size * self.entry_commission) + \
-                         (self.position_size * exit_commission)
-        
-        self.close_value = self.open_value + gross_pnl - total_commission
-        self.value_change = self.close_value - self.open_value
+            gross_pnl = units*(entry_price - exit_price)        
+
+        net_pnl = gross_pnl - total_commission
+
+        self.close_value = self.open_value + net_pnl
+        self.value_change = net_pnl
         self.profit_loss = self.value_change
         self.trade_rate = 1 + (self.profit_loss / self.open_value)
 
