@@ -4,6 +4,7 @@ from dash.dependencies import Input, Output
 import plotly.graph_objects as go
 import pandas as pd
 import datetime
+
 import requests
 
 # Crear la aplicación Dash
